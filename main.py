@@ -122,15 +122,15 @@ class Limit():
         self.lower_price = None
         self.higher_price = None
         self.highest_volume_order = first_order
-        self.first_order = first_order
-        self.last_order = first_order
+        self.head_order = first_order
+        self.tail_order = first_order
         self.price = first_order.price
         self.volumeTotal = first_order.volume
         first_order.limit = self
 
     # Check if limit list is empty / if there are no orders at limit
     def is_empty(self) -> bool:
-        return self.first_order is None
+        return self.head_order is None
     
     # Adds order to limit list
     def ladd(self, order: object):
@@ -138,12 +138,12 @@ class Limit():
         # SHOULD REMOVE THIS EMPTY CHECK ONCE LIMIT GETS AUTO-DELETED WHEN EMPTY
         if self.is_empty():
             self.highest_volume_order = order
-            self.first_order = order
-            self.last_order = order
+            self.head_order = order
+            self.tail_order = order
         else:
-            self.last_order.next_order = order
-            order.prev_order = self.last_order
-            self.last_order = order
+            self.tail_order.next_order = order
+            order.prev_order = self.tail_order
+            self.tail_order = order
             if order.volume > self.highest_volume_order.volume:
                 self.highest_volume_order = order
             self.volumeTotal += order.volume
@@ -154,15 +154,15 @@ class Limit():
             self.highest_volume_order = None
             raise IndexError("Limit is empty.")
     
-        if order == self.first_order:
-            self.first_order = order.next_order
+        if order == self.head_order:
+            self.head_order = order.next_order
             if not self.is_empty():        
-                self.first_order.prev_order = None
+                self.head_order.prev_order = None
         
-        elif order == self.last_order:
-            self.last_order = order.prev_order
-            if self.last_order:
-                self.last_order.next_order = None
+        elif order == self.tail_order:
+            self.tail_order = order.prev_order
+            if self.tail_order:
+                self.tail_order.next_order = None
         
         else:
             order.prev_order.next_order = order.next_order
@@ -176,7 +176,7 @@ class Limit():
 
     # Finds new highest volume order, Time Complexity: O(n), maybe a faster way?
     def _update_highest_volume_order(self):
-        current_order = self.first_order
+        current_order = self.head_order
         highest_volume_order = current_order
         while current_order:
             if current_order.volume > highest_volume_order.volume:
@@ -212,7 +212,7 @@ class Order():
 
 # Orderbook which matches trades, adds orders, removes orders, etc. Time Complexities: | Adding Order: Log(n)|  Removing Order: O(1) | Matching Order: O(1) |   
 class OrderBook():
-    def __init__(self) -> None:
+    def __init__(self, matching_algo = 'FIFO') -> None:
         self.buy_head = None
         self.ask_head = None
         self.lowest_ask_limit = None
@@ -290,28 +290,48 @@ class OrderBook():
         pass
 
     def match(self):
+        pass
+    
+    def fifo(self):
+
         if self.buy_head and self.ask_head:
-            if self.ask_head.lowest_ask_limit <= self.buy_head.highest_buy_limit:
-                spread = abs(self.buy_head.highest_buy_limit - self.ask_head.lowest_ask_limit)
-                # "Ordering" Logic
-                if self.buy_head.highest_buy_limit.volume - spread == 0:
-                    self.buy_head.highest
+
+            if self.highest_buy_limit.price >= self.lowest_ask_limit.price:
+                if self.lowest_ask_limit.head_order.volume > self.highest_buy_limit.head_order.volume:
+                    print(f"Match Found! | Bid : {self.highest_buy_limit.head_order.volume} at {self.highest_buy_limit.head_order.price}| Ask : {self.lowest_ask_limit.head_order.volume} at {self.lowest_ask_limit.head_order.price} |")
+                    self.lowest_ask_limit.head_order.volume -= self.highest_buy_limit.head_order.volume
+                    self.lowest_ask_limit.volumeTotal -= self.highest_buy_limit.head_order.volume
+                    self.highest_buy_limit.remove(self.highest_buy_limit.head_order)
+                    print(f"| Bid Limit Volume: {self.highest_buy_limit.volumeTotal} | Ask Limit Volume: {self.lowest_ask_limit.volumeTotal} |")
+
+                elif self.highest_buy_limit.head_order.volume > self.lowest_ask_limit.head_order.volume:
+                    print(f"Match Found! | Bid : {self.highest_buy_limit.head_order.volume} at {self.highest_buy_limit.head_order.price}| Ask : {self.lowest_ask_limit.head_order.volume} at {self.lowest_ask_limit.head_order.price} | Limit Volume: {self.lowest_ask_limit.volumeTotal}")
+                    self.highest_buy_limit.head_order.volume -= self.lowest_ask_limit.head_order.volume
+                    self.highest_buy_limit.volumeTotal -= self.lowest_ask_limit.head_order.volume
+                    self.lowest_ask_limit.remove(self.lowest_ask_limit.head_order)
+                    print(f"| Bid Limit Volume: {self.highest_buy_limit.volumeTotal} | Ask Limit Volume: {self.lowest_ask_limit.volumeTotal} |")
+
+                else:
+                    print(f"Match Found! | Bid : {self.highest_buy_limit.head_order.volume} at {self.highest_buy_limit.head_order.price}| Ask : {self.lowest_ask_limit.head_order.volume} at {self.lowest_ask_limit.head_order.price} |")
+                    self.lowest_ask_limit.remove(self.lowest_ask_limit.head_order)
+                    self.highest_buy_limit.remove(self.highest_buy_limit.head_order)
+                    print(f"| Bid Limit Volume: {self.highest_buy_limit.volumeTotal} | Ask Limit Volume: {self.lowest_ask_limit.volumeTotal} |")
+        else:
+            raise IndexError("One of the limit lists are empty.")
+            
+                
+
+
 
         
 
 
-order1 = Order(50, 'buy', 20)
-order2 = Order(50, 'buy', 20)
-order3 = Order(100, 'ask', 5)
-order4 = Order(90, 'buy', 9)
+buy_order = Order(600, 'buy', 5)
+sell_order = Order(500, 'buy', 5)
 book = OrderBook()
 
-book.add(order1)
-book.add(order2)
-book.add(order3)
-book.add(order4)
+book.add(buy_order)
+book.add(sell_order)
+book.fifo()
 
-
-print(book.lowest_ask_limit.price)
-print(book.highest_buy_limit.price)
 
