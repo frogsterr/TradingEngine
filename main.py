@@ -150,7 +150,7 @@ class Limit():
                 self.highest_volume_order = order
             self.volumeTotal += order.volume
         
-    # Removes order from limit list
+    # Removes order from limit list, potential memory leaks if attributes aren't cleaned
     def remove(self, order: object):
         if self.is_empty():
             self.highest_volume_order = None
@@ -304,7 +304,7 @@ class OrderBook():
             del self.order_map[order.id]
 
             if order.limit.is_empty():
-                self.remove_limit(order.limit)
+                self.remove_limit(order.limit, type=order.order_type)
 
     def update(self, id: int, price: float = None, volume: int = None):
         if id in self.order_map:
@@ -346,75 +346,56 @@ class OrderBook():
         
         
     # Removes limit order list from tree, potential memory leak if limit is not empty.
-    def remove_limit(self, limit: Limit):
-
-        if limit.lower_price and limit.higher_price:
-            sub = limit.lower_price
-            while sub.higher_price:
-                sub = sub.higher_price
-            sub.parent_limit.higher_price = None
-            sub.higher_price = limit.higher_price
-            sub.lower_price = limit.lower_price
-
-            if limit == self.buy_head:
-                self.buy_head = sub
-                self.buy_head.parent_limit = None
-            elif limit == self.ask_head:
-                self.ask_head = sub
-                self.ask_head.parent_limit = None
-            else:
-                if limit == limit.parent_limit.lower_price:
-                    limit.parent_limit.lower_price = sub
+    def remove_limit(self, limit: Limit, type: str):
+        if type == 'buy':
+            if limit.lower_price is None:
+                if limit == self.buy_head:
+                    self.buy_head = None
+                    self.highest_buy_limit = None
                 else:
-                    limit.parent_limit.higher_price = sub
+                    limit.parent_limit.higher_price = None
+                    self.highest_buy_limit = limit.parent_limit
 
-        elif limit.lower_price:
-            if limit == self.buy_head:
-                self.buy_head = limit.lower_price
-                self.buy_head.parent_limit = None
-            elif limit == self.ask_head:
-                self.ask_head = limit.lower_price
-                self.ask_head.parent_limit = None
-            
+       
             else:
-                limit.parent_limit.lower_price = limit.lower_price
-                limit.lower_price.parent_limit = limit.parent_limit
-            
-            if limit == self.highest_buy_limit:
-                    self.highest_buy_limit = limit.lower_price
-        
-        elif limit.higher_price:
-            if limit == self.buy_head:
-                self.buy_head = limit.higher_price
-                self.buy_head.parent_limit = None
-            elif limit == self.ask_head:
-                self.ask_head = limit.higher_price
-                self.ask_head.parent_limit = None
-            else:
-                limit.parent_limit.lower_price = limit.higher_price
-                limit.higher_price.parent_limit = limit.parent_limit
-            
-            if limit == self.lowest_ask_limit:
-                self.lowest_ask_limit = limit.higher_price
-        
-        else:
-            if limit == self.buy_head:
-                self.buy_head = None
-                self.highest_buy_limit = None # Node will be greatest bid if head
-            elif limit == self.ask_head:
-                self.ask_head = None
-                self.lowest_ask_limit = None # Node will be lowest ask if head
-            
-            if limit == self.highest_buy_limit:
-                self.highest_buy_limit = limit.parent_limit
-                self.highest_buy_limit.higher_price = None
-            
-            elif limit == self.lowest_ask_limit:
-                self.lowest_ask_limit = limit.parent_limit
-                self.lowest_ask_limit.lower_price = None
+                successor = limit.lower_price
+                while successor.higher_price:
+                    successor = successor.higher_price
+                
+                if successor == limit.lower_price:
+                    if limit == self.buy_head:
+                        limit.lower_price = None
+                        successor.parent_limit = None
+                        self.buy_head = successor
+                    else:
+                        limit.parent_limit.higher_price = successor
+                        successor.parent_limit = limit.parent_limit
+
+                else:
+                    if successor.lower_price:
+                        successor.parent_limit.higher_price = successor.lower_price
+                        successor.lower_price.parent_limit = successor.parent_limit
+                        successor.lower_price = limit.lower_price
+                    else: # double check this logic here
+                        successor.parent_limit.highest_price = None
+                        successor.lower_price = limit.lower_price
+
+                    if limit == self.buy_head:
+                        successor.parent_limit = None
+                        self.buy_head = successor
+                    
 
 
-        del limit
+                self.highest_buy_limit = successor
+                del limit
+
+
+
+
+
+
+
+
 
         if not self.buy_head and not self.ask_head:
             print("Order book is now empty.")
