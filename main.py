@@ -181,20 +181,17 @@ class Limit():
         order.next_order = None
         
         del order
-'''
-    # Finds new highest volume order, Time Complexity: O(n), maybe a faster way?
-    def _update_highest_volume_order(self):
-        if self.head_order:
-            current_order = self.head_order
-            highest_volume_order = current_order
-            while current_order:
-                if current_order.volume > highest_volume_order.volume:
-                    highest_volume_order = current_order
-                current_order = current_order.next_order
-            self.highest_volume_order = highest_volume_order
+    
+    def clear(self):
+        if self.is_empty():
+            for key in self.__dict__:
+                self.__dict__[key] = None
         else:
-            self.highest_volume_order = None
-'''
+            while not self.is_empty():
+                self.remove(self.head_order)
+            for key in self.__dict__:
+                self.__dict__[key] = None
+
 # Order class, contains various information about order such as price, volume, id, etc...
 class Order():
     _id_counter = 0
@@ -345,93 +342,71 @@ class OrderBook():
             raise IndexError("One of the limit lists are empty.")
         
         
-    # Removes limit order list from tree, potential memory leak if limit is not empty.
-    def remove_limit(self, limit: Limit, type: str):
-        if type == 'buy':
-            if limit.lower_price is None:
-                if limit == self.buy_head:
-                    self.buy_head = None
-                    self.highest_buy_limit = None
-                else:
+
+    # Removes limit order list from tree, potential data leak if limit is not empty.
+    def remove_highest_buy(self):
+            limit = self.highest_buy_limit
+            #Limit has no lower and higher price
+            if not limit.lower_price and not limit.higher_price:
+                if limit != self.buy_head:
                     limit.parent_limit.higher_price = None
                     self.highest_buy_limit = limit.parent_limit
-
-       
-            else:
-                successor = limit.lower_price
-                while successor.higher_price:
-                    successor = successor.higher_price
-                
-                if successor == limit.lower_price:
-                    if limit == self.buy_head:
-                        limit.lower_price = None
-                        successor.parent_limit = None
-                        self.buy_head = successor
-                    else:
-                        limit.parent_limit.higher_price = successor
-                        successor.parent_limit = limit.parent_limit
-
                 else:
-                    if successor.lower_price:
-                        successor.parent_limit.higher_price = successor.lower_price
-                        successor.lower_price.parent_limit = successor.parent_limit
-                        successor.lower_price = limit.lower_price
-                    else: # double check this logic here
-                        successor.parent_limit.highest_price = None
-                        successor.lower_price = limit.lower_price
-
-                    if limit == self.buy_head:
-                        successor.parent_limit = None
-                        self.buy_head = successor
+                    self.buy_head = None
+                    self.highest_buy_limit = None
+            # Limit has lower price
+            if limit.lower_price:
+                # Finding successor to highest buy
+                succ = limit.lower_price
+                while succ.higher_price:
+                    succ = succ.higher_price
+                # Succ is limit's lower neighbor.
+                if succ == limit.lower_price:
+                    if limit != self.buy_head:
+                        limit.parent_limit.higher_price = succ
+                        succ.parent_limit = limit.parent_limit
+                    else:
+                        succ.parent_limit = None
+                        self.buy_head = succ
+                # Succ is inside tree
+                else:
+                    if succ.lower_price:
+                        succ.parent_limit.higher_price = succ.lower_price
+                        succ.lower_price.parent = succ.parent_limit
+                    else:
+                        succ.parent_limit.higher_price = None
                     
+                    limit.lower_price.parent_limit = succ
+                    succ.lower_price = limit.lower_price
+
+                    if limit != self.buy_head:
+                        limit.parent_limit.higher_price = succ
+                        succ.parent_limit = limit.parent_limit
+                    else:
+                        succ.parent_limit = None
+                        self.buy_head = succ
+
+                self.highest_buy_limit = succ
+            
+            limit.clear()
+            del limit
 
 
-                self.highest_buy_limit = successor
-                del limit
-
-
-
-
-
-
-
-
-
-        if not self.buy_head and not self.ask_head:
-            print("Order book is now empty.")
+            if not self.buy_head and not self.ask_head:
+                print("Buy book is empty.")
 
 
 
 book = OrderBook()
-'''
-buy_order = Order(700, 'buy', 8)
-buy_order1 = Order(650, 'buy', 2)
-buy_order3 = Order(600, 'buy', 4)
-buy_order4 = Order(675, 'buy' ,2)
-buy_order2 = Order(750, 'buy', 4)
-
-sell_order = Order(500, 'ask', 5)
-sell_order2 = Order(600, 'ask', 2)
-
-
-book.add(buy_order)
-book.add(buy_order1)
-book.add(buy_order3)
-book.add(buy_order4)
-book.add(sell_order)
-book.add(sell_order2)
-
-
-'''
+error_map = []
 for x in range(10):
-    randprice = random.randint(700, 710)
-    randvol = random.randint(1,4)
-    book.add(Order(randprice, 'buy', randvol))
-
-for x in range(10):
-    randprice = random.randint(690, 704)
-    randvol = random.randint(1,4)
-    book.add(Order(randprice, 'ask', randvol))
+    if x not in error_map:
+        randprice = random.randint(700, 710)
+        randvol = random.randint(1,4)
+        book.add(Order(randprice, 'buy', randvol))
+    else:
+        error_map.append(randprice)
+    
 
 def exc(func):
     start = time.time()
@@ -439,4 +414,6 @@ def exc(func):
     end = time.time()
     return end-start
 
-print(exc(book.match))
+for x in range(10):
+    print(book.highest_buy_limit.price)
+    book.remove_highest_buy()
