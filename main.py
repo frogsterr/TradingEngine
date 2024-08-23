@@ -265,12 +265,11 @@ class OrderBook():
         else:
             raise IndexError('Order ID not found in order map')
 
-    #FIX MATCH FOR DICT
     def match(self):
             while len(self.buy_side) > 0 and len(self.ask_side):
                 self.fifo()
             print(f"Matching Complete!")
-    # FIX FIFO FOR DICT
+
     def fifo(self):
         if len(self.buy_side) > 0 and len(self.ask_side) > 0:
             highest_buy_limit = self.buy_side.peekitem(-1)[1]
