@@ -22,6 +22,7 @@ void Limit::ladd(Order *ord) {
         ord->prevOrder = tailOrder;
         tailOrder = ord;
     }
+    volumeTotal += ord->quantity;
 }
 
 // Removes order from Limit

@@ -1,11 +1,14 @@
 #include <iostream>
 #include "Order.h"
 #include "Limit.h"
+#include "Trade.h"
 #include "Orderbook.h"
 #include <map>
 #include <unordered_map>
 #include <string>
 #include<stdexcept>
+#include<chrono>
+
 
 Orderbook::Orderbook()
     : buySide(), askSide(), orderMap(){
@@ -117,3 +120,33 @@ void Orderbook::update(Order *ord, int p, int q){
         throw std::invalid_argument("Order ID not found.");
     }
 }
+
+
+Trade Orderbook::match(matchAlgo m) {
+    if (m==matchAlgo::FIFO) {
+        if (!buySide.empty() and !askSide.empty()) {
+            Order *highestBuyOrder = buySide[buySide.rbegin()->first]->headOrder;
+            Order *lowestAskOrder = askSide[askSide.begin()->first]->headOrder;
+
+            if (highestBuyOrder->price >= lowestAskOrder->price) {
+                int matchQuant = std::min(highestBuyOrder->quantity,  lowestAskOrder->quantity);
+                int price = lowestAskOrder->price;
+
+                highestBuyOrder->quantity -= matchQuant;
+                lowestAskOrder->quantity -= matchQuant;
+                highestBuyOrder->limit->volumeTotal -= matchQuant;
+                lowestAskOrder->limit->volumeTotal -= matchQuant;
+
+                if (highestBuyOrder->quantity == 0) {
+                    remove(highestBuyOrder);
+                }
+                if (lowestAskOrder-> quantity ==0 ){
+                    remove(lowestAskOrder);
+                }
+                return Trade(price, matchQuant);
+            }           
+        }
+    return Trade(0,0); 
+    }
+}
+
