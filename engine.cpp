@@ -1,14 +1,14 @@
 #include "Order.h"
 #include "Limit.h"
+#include "Orderbook.h"
 #include <iostream>
 
 int main(){
     std::cout << "Trading Engine Starting..." << std::endl;
-    Order ord = Order(500, 2, OrderType::Buy);
-    Order ord2 = Order(500, 4, OrderType::Buy);
-    Limit lim = Limit(&ord);
-    lim.ladd(&ord2);
-    lim.printLimit();
+    Orderbook ob = Orderbook();
+    Order *ord = new Order(500, 2, OrderType::Buy);
+    ob.add(ord);
+    ob.remove(ord);
     return 0;
 }
 

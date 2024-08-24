@@ -28,6 +28,24 @@ void Limit::ladd(Order *ord) {
 void Limit::remove(Order *ord) {
     if (isEmpty()){
         throw std::invalid_argument("Limit is empty.");
+    } else {
+        if(ord == headOrder){
+            if (headOrder->nextOrder != nullptr) {
+                headOrder = headOrder->nextOrder;
+                headOrder->prevOrder = nullptr;
+            } else {
+                headOrder = nullptr;
+                tailOrder = nullptr;
+            }
+        } else if(ord == tailOrder) {
+            tailOrder = tailOrder->prevOrder;
+            tailOrder->nextOrder = nullptr;
+        } else {
+            ord->prevOrder->nextOrder = ord->nextOrder;
+            ord->nextOrder->prevOrder = ord->prevOrder;
+        }
+        ord->limit = nullptr;
+        volumeTotal -= ord->quantity;
     }
 }
 
@@ -55,5 +73,5 @@ void Limit::printLimit() {
 }
 
 Limit::~Limit(){
-    
+
 }
