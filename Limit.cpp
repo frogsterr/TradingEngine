@@ -5,12 +5,10 @@
 // Initializes Limit
 Limit::Limit(Order *ord) 
     : price(ord->price), lowerPrice(nullptr), higherPrice(nullptr), volumeTotal(ord->quantity), headOrder(ord), tailOrder(ord) {
-        if (ord != nullptr) {
-            ord->limit = this;
-        } else { // change this to a throw error
-            std::cout << "Order doesn't exist." << std::endl;
-        }
-        
+    if (ord == nullptr) {
+        throw std::invalid_argument("Cannot create Limit with null Order.");
+    }
+    ord->limit = this;
 }
 
 // Adds order to limit.
@@ -29,25 +27,33 @@ void Limit::ladd(Order *ord) {
 void Limit::remove(Order *ord) {
     if (isEmpty()){
         throw std::invalid_argument("Limit is empty.");
-    } else {
-        if(ord == headOrder){
-            if (headOrder->nextOrder != nullptr) {
-                headOrder = headOrder->nextOrder;
-                headOrder->prevOrder = nullptr;
-            } else {
-                headOrder = nullptr;
-                tailOrder = nullptr;
-            }
-        } else if(ord == tailOrder) {
-            tailOrder = tailOrder->prevOrder;
+    }
+    if (ord == headOrder){
+        headOrder = headOrder->nextOrder;
+        if (headOrder) {
+            headOrder->prevOrder = nullptr;
+        } else {
+            tailOrder = nullptr;
+        }
+    } else if (ord == tailOrder) {
+        tailOrder = tailOrder->prevOrder;
+        if (tailOrder) {
             tailOrder->nextOrder = nullptr;
         } else {
+            headOrder = nullptr;
+        }
+    } else {
+        if (ord->prevOrder) {
             ord->prevOrder->nextOrder = ord->nextOrder;
+        }
+        if (ord->nextOrder) {
             ord->nextOrder->prevOrder = ord->prevOrder;
         }
-        ord->limit = nullptr;
-        volumeTotal -= ord->quantity;
     }
+    ord->limit = nullptr;
+    ord->prevOrder = nullptr;
+    ord->nextOrder = nullptr;
+    volumeTotal -= ord->quantity;
 }
 
 // Checks if Limit is empty

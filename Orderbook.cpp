@@ -21,7 +21,7 @@ Orderbook::~Orderbook(){
 
 void Orderbook::add(Order *ord){
     if (orderMap.contains(ord->id)) {
-        throw std::invalid_argument("Order not in book.");
+        throw std::invalid_argument("Order in book.");
     } else {
             orderMap[ord->id] = ord;
             if (ord->type == OrderType::Buy) {
@@ -30,12 +30,14 @@ void Orderbook::add(Order *ord){
                 } else {
                     buySide[ord->price] = new Limit(ord);
                 }
+                ord->limit = buySide[ord->price]; // Ladd function probably already does this.
             } else {
                     if (askSide.contains(ord->price)){
                         askSide[ord->price]->ladd(ord);
                     } else {
                         askSide[ord->price] = new Limit(ord);
                     }
+                    ord->limit = askSide[ord->price];
             }
         }
     }
@@ -123,30 +125,55 @@ void Orderbook::update(Order *ord, int p, int q){
 
 
 Trade Orderbook::match(matchAlgo m) {
-    if (m==matchAlgo::FIFO) {
-        if (!buySide.empty() and !askSide.empty()) {
-            Order *highestBuyOrder = buySide[buySide.rbegin()->first]->headOrder;
-            Order *lowestAskOrder = askSide[askSide.begin()->first]->headOrder;
-
-            if (highestBuyOrder->price >= lowestAskOrder->price) {
-                int matchQuant = std::min(highestBuyOrder->quantity,  lowestAskOrder->quantity);
-                int price = lowestAskOrder->price;
-
-                highestBuyOrder->quantity -= matchQuant;
-                lowestAskOrder->quantity -= matchQuant;
-                highestBuyOrder->limit->volumeTotal -= matchQuant;
-                lowestAskOrder->limit->volumeTotal -= matchQuant;
-
-                if (highestBuyOrder->quantity == 0) {
-                    remove(highestBuyOrder);
-                }
-                if (lowestAskOrder-> quantity ==0 ){
-                    remove(lowestAskOrder);
-                }
-                return Trade(price, matchQuant);
-            }           
+    if (m == matchAlgo::FIFO) {
+        if (buySide.empty() || askSide.empty()) {
+            std::cout << "One Side Empty." << std::endl;
+            return Trade(0, 0);
         }
-    return Trade(0,0); 
+
+        auto buyIt = buySide.rbegin();
+        auto askIt = askSide.begin();
+
+        if (buyIt == buySide.rend() || askIt == askSide.end()) {
+            std::cout << "Invalid iterator in buy or ask side." << std::endl;
+            return Trade(0, 0);
+        }
+
+        Limit* highestBuyLimit = buyIt->second;
+        Limit* lowestAskLimit = askIt->second;
+
+        if (!highestBuyLimit || !lowestAskLimit) {
+            std::cout << "Null Limit pointer." << std::endl;
+            return Trade(0, 0);
+        }
+
+        Order* highestBuyOrder = highestBuyLimit->headOrder;
+        Order* lowestAskOrder = lowestAskLimit->headOrder;
+
+        if (!highestBuyOrder || !lowestAskOrder) {
+            std::cout << "Order empty ptr" << std::endl;
+            return Trade(0, 0);
+        }
+
+        if (highestBuyOrder->price >= lowestAskOrder->price) {
+            int matchQuant = std::min(highestBuyOrder->quantity, lowestAskOrder->quantity);
+            int price = lowestAskOrder->price;
+
+            highestBuyOrder->quantity -= matchQuant;
+            lowestAskOrder->quantity -= matchQuant;
+            highestBuyLimit->volumeTotal -= matchQuant;
+            lowestAskLimit->volumeTotal -= matchQuant;
+
+            if (highestBuyOrder->quantity == 0) {
+                remove(highestBuyOrder);
+            }
+            if (lowestAskOrder->quantity == 0) {
+                remove(lowestAskOrder);
+            }
+            return Trade(price, matchQuant);
+        }
     }
+    std::cout << "No match." << std::endl;
+    return Trade(0, 0);
 }
 
